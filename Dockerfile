@@ -1,20 +1,24 @@
-FROM debian:stretch-slim
+FROM golang:1.10.3-alpine
 
-RUN apt-get update && \
-    apt-get install -y curl jq && \
-    curl -O https://packages.chef.io/files/stable/chefdk/3.0.36/debian/9/chefdk_3.0.36-1_amd64.deb && \
-    dpkg -i chefdk_3.0.36-1_amd64.deb && \
-    rm -rf chefdk_3.0.36-1_amd64.deb && \
-    apt-get purge -y curl && \
-    apt-get autoremove -y && \
-    rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache git
 
-RUN useradd -m -s /bin/bash chef
+COPY out /go/src/github.com/Wikia/concourse-knife-resource/out/.
+COPY check /go/src/github.com/Wikia/concourse-knife-resource/check/.
 
-ADD assets/ /opt/resource/
-RUN chmod +x /opt/resource/*
+WORKDIR /go/src/github.com/Wikia/concourse-knife-resource/check
 
-RUN mkdir /root/.chef
+RUN go get && \
+    go build
 
-COPY knife.rb /root/.chef/knife.rb
-COPY credentials /root/.chef/credentials
+COPY in /go/src/github.com/Wikia/concourse-knife-resource/in/.
+
+WORKDIR /go/src/github.com/Wikia/concourse-knife-resource/in
+
+RUN go get && \
+    go build
+
+FROM alpine:3.7
+
+COPY --from=0 /go/src/github.com/Wikia/concourse-knife-resource/check/check /opt/resource/check
+COPY --from=0 /go/src/github.com/Wikia/concourse-knife-resource/in/in /opt/resource/in
+COPY --from=0 /go/src/github.com/Wikia/concourse-knife-resource/out/out /opt/resource/out
